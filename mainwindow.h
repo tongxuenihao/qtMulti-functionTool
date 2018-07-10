@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QTimer>
 #include <QFileDialog>
+#include <QUdpSocket>
 
 #include <QtSerialPort/QSerialPort>
 
@@ -27,17 +28,34 @@ public:
     void programmerSerialInit();
     bool saveFile(const QString &fileName);
     bool writeFile(const QString &fileName);
+    QString ShowHex(QByteArray str);
+    char ConvertHexChar(char ch);
+    QByteArray QString2Hex(QString str);
+    unsigned long inet_addr(char *cp);
+    long atol_(const char* nptr);
+
+    void programmerUdpInit();
 
 private slots:
 	void handleError(QSerialPort::SerialPortError error);
 	void dataSendBaseOnTimer();
 	bool saveAs();
 
+	void getLocalIp();
+	void addMulticastInfo();
+	void applyMulticastInfo();
+	void udpInitDatagram();
+	void udpSendData();
+	void udpRecvData();
+	void udpRecvSaveAs();
+	void udpRecvClear();
+	void udpSendClear();
 
 private:
     Ui::MainWindow *ui;
 
     programmerSerial *programmerserial;
+    QUdpSocket *mSocket;
     void getSerialInfo();
     void OpenSerial();
     void showStatusMessage(const QString &message);
@@ -52,6 +70,8 @@ private:
 
     void settingHide();
     void settingOpen();
+
+
 
 };
 
