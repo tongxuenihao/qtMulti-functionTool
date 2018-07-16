@@ -267,6 +267,7 @@ void MainWindow::programmerUdpInit()
     connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::udpRecvSaveAs);
     connect(ui->pushButton_5, &QPushButton::clicked, this, &MainWindow::udpRecvClear);
     connect(ui->pushButton_10, &QPushButton::clicked, this, &MainWindow::udpSendClear);
+    connect(ui->action_3, &QAction::triggered, this, &MainWindow::multicastInfoShow);
 }
 
 void MainWindow::getLocalIp()
@@ -303,7 +304,7 @@ void MainWindow::applyMulticastInfo()
     QString mString = ui->pushButton_4->text();
     if(mString == "开启")
     {
-        QMessageBox::critical(this, tr("Critical Error"), "请开始UDP");
+        QMessageBox::critical(this, tr("Critical Error"), "请开启UDP");
         return;
     }
 
@@ -481,6 +482,7 @@ void MainWindow::udpRecvData()
     }
 
     ui->textBrowser_2->append("接收：" + receiveMsg);
+
 }
 
 
@@ -516,6 +518,15 @@ void MainWindow::udpRecvClear()
 void MainWindow::udpSendClear()
 {
     ui->lineEdit_13->clear();
+}
+
+void MainWindow::multicastInfoShow()
+{
+    QMessageBox message(QMessageBox::NoIcon, "提示", "224.0.0.0～224.0.0.255为预留的组播地址；"
+                                                   "224.0.1.0～224.0.1.255是公用组播地址；"
+                                                   "224.0.2.0～238.255.255.255为用户可用的组播地址；"
+                                                   "239.0.0.0～239.255.255.255为本地管理组播地址。");
+    message.exec();
 }
 
 

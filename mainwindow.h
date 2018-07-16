@@ -50,6 +50,7 @@ private slots:
 	void udpRecvSaveAs();
 	void udpRecvClear();
 	void udpSendClear();
+	void multicastInfoShow();
 
 private:
     Ui::MainWindow *ui;
