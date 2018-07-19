@@ -19,6 +19,8 @@
 #include <QtEndian>
 #include<QDebug>
 #include <QUdpSocket>
+#include<QtNetwork/QTcpSocket>
+#include<QtNetwork/QTcpServer>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -32,17 +34,23 @@ MainWindow::MainWindow(QWidget *parent) :
 
     programmerserial = new programmerSerial;  //串口类
     mSocket = new QUdpSocket();
+    mTcpServer = new QTcpServer();
+    mTcpServerSocket = new QTcpSocket();
+    mTcpClientSocket = new QTcpSocket();
     operateMenuInit();        //操作菜单初始化
     settingMenuInit();        //设置菜单初始化
     programmerSerialInit();   //串口部分初始化
     programmerUdpInit();      //UDP部分初始化
-
+    programmerTcpInit();      //TCP部分初始化
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
     delete programmerserial;
+    delete mSocket;
+    delete mTcpServer;
+    delete mTcpServerSocket;
 }
 
 /*操作菜单*/
@@ -166,7 +174,7 @@ void MainWindow::readData()
     static QByteArray data; 
     data += programmerserial->serial->readAll();
     QString receiveMsg; 
-    if(data.endsWith("\n"))
+    if(data.contains("\n"))
     {
         if(ui->checkBox_5->isChecked())
             receiveMsg = programmerserial->ShowHex(data);
@@ -256,7 +264,7 @@ void MainWindow::windowClear()
 /*************************UDP部分接口*********************************/
 void MainWindow::programmerUdpInit()
 {
-    mSocket = new QUdpSocket();
+    //mSocket = new QUdpSocket();
     ui->groupBox_7->hide();
     connect(ui->pushButton_19, &QPushButton::clicked, this, &MainWindow::getLocalIp);
     connect(ui->pushButton_2, &QPushButton::clicked, this, &MainWindow::addMulticastInfo);
@@ -419,8 +427,7 @@ void MainWindow::udpSendData()
     {
         if(ui->checkBox_10->isChecked())
         {
-            dataStr = QString2Hex(dataStr);
-            QByteArray temp= mString.toLatin1();
+            QByteArray temp = QString2Hex(dataStr);
             mSocket->writeDatagram(temp,QHostAddress::Broadcast,ui->lineEdit_4->text().toInt());
         }
         else
@@ -530,7 +537,299 @@ void MainWindow::multicastInfoShow()
 }
 
 
+/*************************TCP部分接口*********************************/
+void MainWindow::programmerTcpInit()
+{
+    ui->groupBox_10->hide();
+    ui->groupBox_11->hide();
+    ui->groupBox_12->hide();
+    ui->groupBox_13->hide();
+    ui->radioButton->setEnabled(false);
+    ui->radioButton_2->setEnabled(false);
+    connect(ui->pushButton_11, &QPushButton::clicked, this, &MainWindow::tcpServerInit);
+    connect(ui->pushButton_12, &QPushButton::clicked, this, &MainWindow::tcpClientInit);
+    connect(ui->pushButton_13, &QPushButton::clicked, this, &MainWindow::serverServiceInit);
+    connect(ui->pushButton_14, &QPushButton::clicked, this, &MainWindow::clientServiceInit);
+    connect(ui->pushButton_21, &QPushButton::clicked, this, &MainWindow::tcpSendData);
+    connect(ui->pushButton_16, &QPushButton::clicked, this, &MainWindow::tcpRecvSaveAs);
+    connect(ui->pushButton_15, &QPushButton::clicked, this, &MainWindow::tcpRecvClear);
+    connect(ui->pushButton_17, &QPushButton::clicked, this, &MainWindow::tcpSendClear);
+}
+
+void MainWindow::tcpSendData()
+{
+    QString sendMessage = ui->lineEdit_15->text();
+    if(ui->checkBox_13->isChecked())
+    {
+        QByteArray temp = QString2Hex(sendMessage);
+        if((ui->radioButton->isChecked()) || (!ui->radioButton_2->isChecked()))
+        {
+            mTcpServerSocket->write(temp);
+        }
+        else if((!ui->radioButton->isChecked()) || (ui->radioButton_2->isChecked()))
+        {
+            mTcpClientSocket->write(temp);
+        }
+
+        if(ui->checkBox_12->isChecked())
+        {
+            ui->textBrowser_3->append("发送:" + ShowHex(temp));
+        }
+    }
+    else
+    {
+        if((ui->radioButton->isChecked()) || (!ui->radioButton_2->isChecked()))
+        {
+            mTcpServerSocket->write(sendMessage.toLocal8Bit());
+        }
+        else if((!ui->radioButton->isChecked()) || (ui->radioButton_2->isChecked()))
+        {
+            mTcpClientSocket->write(sendMessage.toLocal8Bit());
+        }
+
+        if(ui->checkBox_12->isChecked())
+        {
+            ui->textBrowser_3->append("发送:" + sendMessage);
+        }
+    }
+}
+
+void MainWindow::tcpRecvSaveAs()
+{
+    QString fileName = QFileDialog::getSaveFileName(this,
+                                                    tr("Save Data"), ".",
+                                                    tr("Text File (*.txt)"));
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QFile::Text)) {
+        QMessageBox::warning(this, tr("Save Data"),
+                                                       tr("Cannot write file %1 : \n%2")
+                                                       .arg(file.fileName())
+                                                       .arg(file.errorString()));
+        return;
+    }
+
+    QTextStream out(&file);
+    out << ui->textBrowser_3->toPlainText();
+    statusBar()->showMessage(tr("Data saved"), 2000);
+    return;
+}
+
+void MainWindow::tcpRecvClear()
+{
+    ui->textBrowser_3->clear();
+}
+
+void MainWindow::tcpSendClear()
+{
+    ui->lineEdit_15->clear();
+}
+
+/*************SERVER部分接口***************/
+void MainWindow::tcpServerInit()
+{
+    ui->groupBox_10->show();
+    ui->groupBox_11->hide();
+    ui->lineEdit_8->setEnabled(false);
+    QString localIpStr = getTcpLocalIp();
+    ui->lineEdit_8->setText(localIpStr);
+}
+
+
+void MainWindow::serverServiceInit()
+{
+    QString mString = ui->pushButton_13->text();
+    if(mString == "关闭服务")
+    {
+        ui->pushButton_12->setEnabled(true);
+        ui->pushButton_13->setText("开启服务");
+        ui->lineEdit_8->clear();
+        ui->lineEdit_9->clear();
+        ui->label_12->setText("本地信息");
+        ui->label_13->setText("连接信息");
+        ui->groupBox_10->hide();
+        ui->groupBox_12->hide();
+        ui->groupBox_13->hide();
+        ui->textBrowser_3->clear();
+        ui->lineEdit_15->clear();
+        disconnect(mTcpServer,SIGNAL(newConnection()), this,SLOT(newConnect()));
+        mTcpServer->close();
+        if(clientFlag == true)
+        {
+            mTcpServerSocket->close();
+            clientFlag = false;
+            ui->radioButton->setChecked(false);
+        } 
+        return; 
+    }
+    QString dataStr = ui->lineEdit_9->text();
+    if(dataStr == 0)
+    {
+        QMessageBox::critical(this, tr("Critical Error"), "请输入端口号");
+        return; 
+    }
+    mTcpServer->listen(QHostAddress::Any,ui->lineEdit_9->text().toInt());
+    connect(mTcpServer,SIGNAL(newConnection()), this,SLOT(newConnect()));
+    ui->label_12->setText("服务器:" + ui->lineEdit_8->text() + ":" + ui->lineEdit_9->text());
+    ui->pushButton_13->setText("关闭服务");
+    ui->pushButton_12->setEnabled(false);
+}
+
+void MainWindow::newConnect()
+{
+    mTcpServerSocket = mTcpServer->nextPendingConnection();
+    clientFlag = true;
+    //ui->label_13->setText("客户端:" + mTcpServerSocket->peerAddress().toString());
+    ui->groupBox_12->show();
+    ui->groupBox_13->show();
+    connect(mTcpServerSocket,SIGNAL(readyRead()),this,SLOT(readMessage())); //服务器接收客户端的消息   
+    connect(mTcpServerSocket,SIGNAL(disconnected()),this,SLOT(deleteSocket()));
+    ui->radioButton->setChecked(true);
+}
+
+void MainWindow::readMessage()
+{
+    QByteArray array;
+    array = mTcpServerSocket->readAll();
+
+    QString receiveMsg; 
+    if(ui->checkBox_11->isChecked())
+    {
+        receiveMsg = ShowHex(array);
+    }
+    else
+    {
+        receiveMsg = QString::fromLocal8Bit(array);
+    }
+    ui->textBrowser_3->append("接收：" + receiveMsg);
+}
+
+
+void MainWindow::deleteSocket()
+{
+    QMessageBox::critical(this, tr("Critical Error"), "连接断开");
+    ui->label_13->setText("连接信息");
+    ui->groupBox_12->hide();
+    ui->groupBox_13->hide();
+    clientFlag = false;
+    ui->textBrowser_3->clear();
+    ui->lineEdit_15->clear();
+    ui->radioButton->setChecked(false);
+}
+
+
+/*************CLIENT部分接口***************/
+void MainWindow::tcpClientInit()
+{
+    ui->groupBox_10->hide();
+    ui->groupBox_11->show();
+    ui->lineEdit_8->setEnabled(false);
+    QString localIpStr = getTcpLocalIp();
+    ui->lineEdit_10->setText(localIpStr);
+}
+
+void MainWindow::clientServiceInit()
+{
+    QString mString = ui->pushButton_14->text();
+    if(mString == "关闭服务")
+    {
+        ui->pushButton_11->setEnabled(true);
+        ui->pushButton_14->setText("开启服务");
+        ui->lineEdit_11->clear();
+        ui->lineEdit_14->clear();
+        ui->groupBox_11->hide();
+        ui->groupBox_12->hide();
+        ui->groupBox_13->hide();
+        ui->textBrowser_3->clear();
+        ui->lineEdit_15->clear();
+        if(clientConnectFlag == true)
+        {
+                mTcpClientSocket->close();
+                clientConnectFlag = false;
+        }
+        return; 
+    }
+    QString IpStr = ui->lineEdit_14->text();
+    if(IpStr == 0)
+    {
+        QMessageBox::critical(this, tr("Critical Error"), "请输入IP");
+        return; 
+    }
+
+    QString portStr = ui->lineEdit_11->text();
+    if(portStr == 0)
+    {
+        QMessageBox::critical(this, tr("Critical Error"), "请输入端口号");
+        return; 
+    }
+    mTcpClientSocket->connectToHost(IpStr,portStr.toInt());
+    connect(mTcpClientSocket,SIGNAL(connected()),this,SLOT(clientConnectSuccess()));
+    connect(mTcpClientSocket,SIGNAL(disconnected()),this,SLOT(clientDisconnect()));
+}
+
+void MainWindow::clientReadMessage()
+{
+    QByteArray array;
+    array = mTcpClientSocket->readAll();
+
+    QString receiveMsg; 
+    if(ui->checkBox_11->isChecked())
+    {
+        receiveMsg = ShowHex(array);
+    }
+    else
+    {
+        receiveMsg = QString::fromLocal8Bit(array);
+    }
+    ui->textBrowser_3->append("接收：" + receiveMsg);
+}
+
+void MainWindow::clientConnectSuccess()
+{
+    ui->groupBox_12->show();
+    ui->groupBox_13->show();
+    ui->pushButton_14->setText("关闭服务");
+    ui->pushButton_11->setEnabled(false);
+    connect(mTcpClientSocket,SIGNAL(readyRead()),this,SLOT(clientReadMessage()));
+    clientConnectFlag = true;
+    ui->radioButton_2->setChecked(true);
+}
+
+void MainWindow::clientDisconnect()
+{
+    QMessageBox::critical(this, tr("Critical Error"), "连接断开");
+    ui->groupBox_12->hide();
+    ui->groupBox_13->hide();
+    ui->textBrowser_3->clear();
+    ui->lineEdit_15->clear();
+    clientConnectFlag = false;
+    ui->radioButton_2->setChecked(false);
+}
+
+
 /*************************共用部分接口*********************************/
+QString MainWindow::getTcpLocalIp()
+{
+    QString ipAddr;
+    QList<QHostAddress> AddressList = QNetworkInterface::allAddresses();
+    foreach(QHostAddress address, AddressList){
+        if(address.protocol() == QAbstractSocket::IPv4Protocol &&
+                address != QHostAddress::Null &&
+                address != QHostAddress::LocalHost){
+            if (address.toString().contains("127.0.")){
+                continue;
+            }
+            ipAddr = address.toString();
+            break;
+        }
+    }
+    return ipAddr;
+}
+
+
 long MainWindow::atol_(const char* nptr)
 {
     long total = 0;

@@ -10,6 +10,8 @@
 #include <QUdpSocket>
 
 #include <QtSerialPort/QSerialPort>
+#include<QtNetwork/QTcpSocket>
+#include<QtNetwork/QTcpServer>
 
 namespace Ui {
 class MainWindow;
@@ -35,6 +37,9 @@ public:
     long atol_(const char* nptr);
 
     void programmerUdpInit();
+    void programmerTcpInit();
+
+    QString getTcpLocalIp();
 
 private slots:
 	void handleError(QSerialPort::SerialPortError error);
@@ -52,11 +57,34 @@ private slots:
 	void udpSendClear();
 	void multicastInfoShow();
 
+	void tcpServerInit();
+	void tcpClientInit();
+	void serverServiceInit();
+	void clientServiceInit();
+
+	void newConnect();
+	void readMessage();
+	void tcpSendData();
+	void deleteSocket();
+
+	void clientReadMessage();
+	void clientConnectSuccess();
+	void clientDisconnect();
+
+	void tcpRecvSaveAs();
+	void tcpRecvClear();
+	void tcpSendClear();
+
 private:
     Ui::MainWindow *ui;
 
     programmerSerial *programmerserial;
     QUdpSocket *mSocket;
+    QTcpSocket *mTcpServerSocket;
+    QTcpSocket *mTcpClientSocket;
+    QTcpServer *mTcpServer;
+    bool clientFlag = false;
+    bool clientConnectFlag = false;
     void getSerialInfo();
     void OpenSerial();
     void showStatusMessage(const QString &message);
