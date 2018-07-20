@@ -785,6 +785,7 @@ void MainWindow::clientReadMessage()
         receiveMsg = QString::fromLocal8Bit(array);
     }
     ui->textBrowser_3->append("接收：" + receiveMsg);
+    
 }
 
 void MainWindow::clientConnectSuccess()
